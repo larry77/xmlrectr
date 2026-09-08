@@ -1,0 +1,11 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  development: development.html
+  getting-started: getting-started.html
+  large-xml: large-xml.html
+last_built: 2026-09-08T07:37Z
+urls:
+  reference: https://larry77.github.io/xmlrectr/reference
+  article: https://larry77.github.io/xmlrectr/articles
