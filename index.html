@@ -67,6 +67,48 @@
 <p>The package is deliberately generic. It contains no special rules for MARC, FHIR, EAD, ONIX, GPX, UBL, or any other XML vocabulary.</p>
 <hr>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<p>At present, <code>xmlrectr</code> can be installed from GitHub.</p>
+<p>The recommended method is <code>pak</code>:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"larry77/xmlrectr"</span><span class="op">)</span></span></code></pre></div>
+<p>Alternatively:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
+<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"larry77/xmlrectr"</span><span class="op">)</span></span></code></pre></div>
+<p>Because <code>xmlrectr</code> contains native C code, the GitHub version is compiled from source and requires a working build toolchain and <code>libxml2</code> development files.</p>
+<details><summary><strong>Windows build requirements</strong>
+</summary><p>Windows is a first-class supported platform. Use the Rtools version matching your R installation and install it in the default location.</p>
+<p>For the currently supported R series:</p>
+<ul>
+<li>R 4.6.x: Rtools45</li>
+<li>R 4.5.x: Rtools45</li>
+<li>R 4.4.x: Rtools44</li>
+</ul>
+<p>With a normal R/Rtools installation, manual <code>PATH</code> configuration should not usually be necessary.</p>
+<p>If compilation fails, first check the toolchain:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pkgbuild"</span><span class="op">)</span></span>
+<span><span class="fu">pkgbuild</span><span class="fu">::</span><span class="fu"><a href="https://pkgbuild.r-lib.org/reference/has_build_tools.html" class="external-link">has_build_tools</a></span><span class="op">(</span>debug <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+<p>Avoid mixing Rtools with unrelated MSYS2/MinGW/Strawberry Perl toolchains on <code>PATH</code>, as this can produce difficult-to-diagnose linking problems.</p>
+<p>The GitHub Actions workflow compiles and tests the package on <code>windows-latest</code>.</p>
+</details><details><summary><strong>Linux build requirements</strong>
+</summary><p>On Debian/Ubuntu:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">sudo</span> apt install libxml2-dev pkg-config</span></code></pre></div>
+<p>Then install <code>xmlrectr</code> from R using <code>pak</code> or <code>remotes</code>.</p>
+</details><details><summary><strong>macOS build requirements</strong>
+</summary><p>With Homebrew:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="ex">brew</span> install libxml2 pkg-config</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="bu">export</span> <span class="va">PKG_CONFIG_PATH</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">brew</span> <span class="at">--prefix</span> libxml2<span class="va">)</span><span class="st">/lib/pkgconfig:</span><span class="va">$PKG_CONFIG_PATH</span><span class="st">"</span></span></code></pre></div>
+<p>Then install <code>xmlrectr</code> from R.</p>
+</details><p>For a local checkout:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/local_install.html" class="external-link">local_install</a></span><span class="op">(</span><span class="st">"."</span><span class="op">)</span></span></code></pre></div>
+<hr>
+</div>
+<div class="section level2">
 <h2 id="why-xml-rectangling-is-hard">Why XML rectangling is hard<a class="anchor" aria-label="anchor" href="#why-xml-rectangling-is-hard"></a>
 </h2>
 <p>XML is hierarchical. Analytical data is usually rectangular.</p>
@@ -108,7 +150,7 @@
 <h3 id="id_1-analytical-automation-how-should-this-xml-become-a-table">1. Analytical automation: how should this XML become a table?<a class="anchor" aria-label="anchor" href="#id_1-analytical-automation-how-should-this-xml-become-a-table"></a>
 </h3>
 <p>For exploration, <code><a href="reference/rectangle_xml_analyst.html">rectangle_xml_analyst()</a></code> can start from the XML file itself:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://larry77.github.io/xmlrectr/">xmlrectr</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"orders.xml"</span>, package <span class="op">=</span> <span class="st">"xmlrectr"</span><span class="op">)</span></span>
@@ -135,7 +177,7 @@
 <p>Once a rectangle is defined, execution has its own set of choices: sequential or parallel processing, worker count, chunk size, task size, memory ownership, and whether a large document should be streamed instead of fully materialised.</p>
 <p>Those choices are intentionally separated from the analytical meaning of the rectangle.</p>
 <p>For the normal rectangling APIs, one argument can ask <code>xmlrectr</code> to choose whether parallel execution is worthwhile:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
 <span>  <span class="va">file</span>,</span>
 <span>  <span class="va">profile</span>,</span>
@@ -154,7 +196,7 @@
 <h3 id="you-know-almost-nothing-about-the-xml">You know almost nothing about the XML<a class="anchor" aria-label="anchor" href="#you-know-almost-nothing-about-the-xml"></a>
 </h3>
 <p>Start with the automatic analyst table:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">analyst</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rectangle_xml_analyst.html">rectangle_xml_analyst</a></span><span class="op">(</span><span class="va">file</span><span class="op">)</span></span></code></pre></div>
 <p>This is the quickest route from an unfamiliar document to an R tibble.</p>
 </div>
@@ -162,7 +204,7 @@
 <h3 id="you-want-to-understand-the-structure-before-deciding">You want to understand the structure before deciding<a class="anchor" aria-label="anchor" href="#you-want-to-understand-the-structure-before-deciding"></a>
 </h3>
 <p>Ask the package for a proposal:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">proposal</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/propose_xml_profile.html">propose_xml_profile</a></span><span class="op">(</span><span class="va">file</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="reference/review_xml_proposal.html">review_xml_proposal</a></span><span class="op">(</span><span class="va">proposal</span>, <span class="st">"rows"</span><span class="op">)</span></span>
@@ -174,7 +216,7 @@
 <h3 id="you-know-what-you-want-to-expose">You know what you want to expose<a class="anchor" aria-label="anchor" href="#you-know-what-you-want-to-expose"></a>
 </h3>
 <p>Define it explicitly:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">profile</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/xml_profile.html">xml_profile</a></span><span class="op">(</span></span>
 <span>  rows <span class="op">=</span> <span class="st">"order"</span>,</span>
 <span>  id <span class="op">=</span> <span class="st">"id"</span></span>
@@ -183,12 +225,12 @@
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span><span class="va">file</span>, <span class="va">profile</span><span class="op">)</span></span></code></pre></div>
 <p>A profile can also select and rename fields, specify types, provide namespace information, and choose the desired layout.</p>
 <p>You can save the reviewed decision:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/write_xml_profile.html">write_xml_profile</a></span><span class="op">(</span><span class="va">profile</span>, <span class="st">"orders-profile.json"</span><span class="op">)</span></span>
 <span><span class="va">profile2</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/read_xml_profile.html">read_xml_profile</a></span><span class="op">(</span><span class="st">"orders-profile.json"</span><span class="op">)</span></span></code></pre></div>
 <p>and reuse it across files belonging to the same XML family.</p>
 <p>For repeated processing, compile the profile once:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">spec</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compile_xml_profile.html">compile_xml_profile</a></span><span class="op">(</span><span class="va">profile</span>, <span class="va">file</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
@@ -204,7 +246,7 @@
 <h2 id="xsd-assisted-work">XSD-assisted work<a class="anchor" aria-label="anchor" href="#xsd-assisted-work"></a>
 </h2>
 <p>If an XSD is available, <code>xmlrectr</code> can use it as additional structural evidence:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">xml</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"types.xml"</span>, package <span class="op">=</span> <span class="st">"xmlrectr"</span><span class="op">)</span></span>
 <span><span class="va">xsd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"types.xsd"</span>, package <span class="op">=</span> <span class="st">"xmlrectr"</span><span class="op">)</span></span>
 <span></span>
@@ -268,7 +310,7 @@
 <h3 id="bounded-memory-streaming">Bounded-memory streaming<a class="anchor" aria-label="anchor" href="#bounded-memory-streaming"></a>
 </h3>
 <p>For XML that should not be represented as one complete in-memory canonical table, <code>xmlrectr</code> provides a streaming path based on <strong>complete record subtrees</strong>.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">batches</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">stats</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/xml_stream_rectangle.html">xml_stream_rectangle</a></span><span class="op">(</span></span>
@@ -294,7 +336,7 @@
 <h3 id="csv-and-parquet-output">CSV and Parquet output<a class="anchor" aria-label="anchor" href="#csv-and-parquet-output"></a>
 </h3>
 <p>Large results can be written without first collecting the entire rectangle into one R object:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml_csv.html">rectangle_xml_csv</a></span><span class="op">(</span></span>
 <span>  <span class="st">"large.xml"</span>,</span>
 <span>  <span class="va">spec</span>,</span>
@@ -302,7 +344,7 @@
 <span>  parallel <span class="op">=</span> <span class="st">"auto"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>For typed analytical output:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml_parquet.html">rectangle_xml_parquet</a></span><span class="op">(</span></span>
 <span>  <span class="st">"large.xml"</span>,</span>
 <span>  <span class="va">spec</span>,</span>
@@ -318,7 +360,7 @@
 <h2 id="parallel-execution-without-a-second-api">Parallel execution without a second API<a class="anchor" aria-label="anchor" href="#parallel-execution-without-a-second-api"></a>
 </h2>
 <p>Parallelism is an execution choice of the same rectangling operation, not a separate family of user-facing functions.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Exact sequential path</span></span>
 <span><span class="va">seq_out</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
 <span>  <span class="va">file</span>,</span>
@@ -340,7 +382,7 @@
 <span>  parallel <span class="op">=</span> <span class="st">"auto"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>The sequential implementation is the semantic oracle. Parallel execution is required to preserve the same result:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">seq_out</span>, <span class="va">par_out</span><span class="op">)</span></span></code></pre></div>
 <p>The three modes have deliberately simple meanings:</p>
 <ul>
@@ -374,7 +416,7 @@
 <h2 id="why-the-scheduler-is-adaptive">Why the scheduler is adaptive<a class="anchor" aria-label="anchor" href="#why-the-scheduler-is-adaptive"></a>
 </h2>
 <p>Parallel XML rectangling is not simply a matter of running:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">workers</span> <span class="op">&lt;-</span> <span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/detectCores.html" class="external-link">detectCores</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>and dividing a file into equal pieces.</p>
 <p>A useful execution plan depends on the <strong>actual structural work available</strong>:</p>
@@ -395,7 +437,7 @@
 <p>The automatic/default worker policy therefore normally uses <strong>up to four workers</strong>, while preserving a core for the system where possible.</p>
 <p>This is <strong>not a hard maximum</strong>.</p>
 <p>Advanced users can explicitly request more workers:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
 <span>  <span class="va">file</span>,</span>
 <span>  <span class="va">spec</span>,</span>
@@ -647,10 +689,10 @@ task_records  -&gt; controls scheduling granularity inside that work</code></pre
 <h2 id="tuning-for-technically-minded-users">Tuning for technically minded users<a class="anchor" aria-label="anchor" href="#tuning-for-technically-minded-users"></a>
 </h2>
 <p>Most users should stop at:</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span><span class="va">file</span>, <span class="va">spec</span>, parallel <span class="op">=</span> <span class="st">"auto"</span><span class="op">)</span></span></code></pre></div>
 <p>The following controls exist for benchmarking, unusually constrained machines, or specialist tuning:</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
 <span>  <span class="va">file</span>,</span>
 <span>  <span class="va">spec</span>,</span>
@@ -679,7 +721,7 @@ task_records  -&gt; controls scheduling granularity inside that work</code></pre
 </h2>
 <p>For performance work, compare strategies on <strong>the same machine and the same XML</strong>.</p>
 <p>A simple reproducible pattern is:</p>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">spec</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compile_xml_profile.html">compile_xml_profile</a></span><span class="op">(</span><span class="va">profile</span>, <span class="va">file</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">t_seq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span></span>
@@ -851,48 +893,6 @@ task_records  -&gt; controls scheduling granularity inside that work</code></pre
 <p><code>xmlrectr</code> expects well-formed XML.</p>
 <p>Malformed XML is detected and reported as an error or warning where appropriate. Repairing broken XML is intentionally outside the scope of the package: <code>xmlrectr</code> rectangles XML; it does not try to guess how a malformed source document should be rewritten.</p>
 <p>Likewise, XSD inspection is intended to provide useful schema evidence for rectangling. <code>xmlrectr</code> is not a complete XSD validation or repair framework.</p>
-<hr>
-</div>
-<div class="section level2">
-<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
-</h2>
-<p>At present, <code>xmlrectr</code> can be installed from GitHub.</p>
-<p>The recommended method is <code>pak</code>:</p>
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span></span>
-<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"larry77/xmlrectr"</span><span class="op">)</span></span></code></pre></div>
-<p>Alternatively:</p>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"larry77/xmlrectr"</span><span class="op">)</span></span></code></pre></div>
-<p>Because <code>xmlrectr</code> contains native C code, the GitHub version is compiled from source and requires a working build toolchain and <code>libxml2</code> development files.</p>
-<details><summary><strong>Windows build requirements</strong>
-</summary><p>Windows is a first-class supported platform. Use the Rtools version matching your R installation and install it in the default location.</p>
-<p>For the currently supported R series:</p>
-<ul>
-<li>R 4.6.x: Rtools45</li>
-<li>R 4.5.x: Rtools45</li>
-<li>R 4.4.x: Rtools44</li>
-</ul>
-<p>With a normal R/Rtools installation, manual <code>PATH</code> configuration should not usually be necessary.</p>
-<p>If compilation fails, first check the toolchain:</p>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pkgbuild"</span><span class="op">)</span></span>
-<span><span class="fu">pkgbuild</span><span class="fu">::</span><span class="fu"><a href="https://pkgbuild.r-lib.org/reference/has_build_tools.html" class="external-link">has_build_tools</a></span><span class="op">(</span>debug <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>Avoid mixing Rtools with unrelated MSYS2/MinGW/Strawberry Perl toolchains on <code>PATH</code>, as this can produce difficult-to-diagnose linking problems.</p>
-<p>The GitHub Actions workflow compiles and tests the package on <code>windows-latest</code>.</p>
-</details><details><summary><strong>Linux build requirements</strong>
-</summary><p>On Debian/Ubuntu:</p>
-<div class="sourceCode" id="cb36"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">sudo</span> apt install libxml2-dev pkg-config</span></code></pre></div>
-<p>Then install <code>xmlrectr</code> from R using <code>pak</code> or <code>remotes</code>.</p>
-</details><details><summary><strong>macOS build requirements</strong>
-</summary><p>With Homebrew:</p>
-<div class="sourceCode" id="cb37"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="ex">brew</span> install libxml2 pkg-config</span>
-<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a><span class="bu">export</span> <span class="va">PKG_CONFIG_PATH</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">brew</span> <span class="at">--prefix</span> libxml2<span class="va">)</span><span class="st">/lib/pkgconfig:</span><span class="va">$PKG_CONFIG_PATH</span><span class="st">"</span></span></code></pre></div>
-<p>Then install <code>xmlrectr</code> from R.</p>
-</details><p>For a local checkout:</p>
-<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/local_install.html" class="external-link">local_install</a></span><span class="op">(</span><span class="st">"."</span><span class="op">)</span></span></code></pre></div>
 <hr>
 </div>
 <div class="section level2">
