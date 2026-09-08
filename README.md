@@ -14,6 +14,87 @@ The package is deliberately generic. It contains no special rules for MARC, FHIR
 
 ---
 
+## Installation
+
+At present, `xmlrectr` can be installed from GitHub.
+
+The recommended method is `pak`:
+
+```r
+install.packages("pak")
+pak::pak("larry77/xmlrectr")
+```
+
+Alternatively:
+
+```r
+install.packages("remotes")
+remotes::install_github("larry77/xmlrectr")
+```
+
+Because `xmlrectr` contains native C code, the GitHub version is compiled from source and requires a working build toolchain and `libxml2` development files.
+
+<details>
+<summary><strong>Windows build requirements</strong></summary>
+
+Windows is a first-class supported platform. Use the Rtools version matching your R installation and install it in the default location.
+
+For the currently supported R series:
+
+- R 4.6.x: Rtools45
+- R 4.5.x: Rtools45
+- R 4.4.x: Rtools44
+
+With a normal R/Rtools installation, manual `PATH` configuration should not usually be necessary.
+
+If compilation fails, first check the toolchain:
+
+```r
+install.packages("pkgbuild")
+pkgbuild::has_build_tools(debug = TRUE)
+```
+
+Avoid mixing Rtools with unrelated MSYS2/MinGW/Strawberry Perl toolchains on `PATH`, as this can produce difficult-to-diagnose linking problems.
+
+The GitHub Actions workflow compiles and tests the package on `windows-latest`.
+
+</details>
+
+<details>
+<summary><strong>Linux build requirements</strong></summary>
+
+On Debian/Ubuntu:
+
+```bash
+sudo apt install libxml2-dev pkg-config
+```
+
+Then install `xmlrectr` from R using `pak` or `remotes`.
+
+</details>
+
+<details>
+<summary><strong>macOS build requirements</strong></summary>
+
+With Homebrew:
+
+```bash
+brew install libxml2 pkg-config
+export PKG_CONFIG_PATH="$(brew --prefix libxml2)/lib/pkgconfig:$PKG_CONFIG_PATH"
+```
+
+Then install `xmlrectr` from R.
+
+</details>
+
+For a local checkout:
+
+```r
+pak::local_install(".")
+```
+
+---
+
 ## Why XML rectangling is hard
 
 XML is hierarchical. Analytical data is usually rectangular.
@@ -878,87 +959,6 @@ The public API is simple because this machinery sits underneath it, not because 
 Malformed XML is detected and reported as an error or warning where appropriate. Repairing broken XML is intentionally outside the scope of the package: `xmlrectr` rectangles XML; it does not try to guess how a malformed source document should be rewritten.
 
 Likewise, XSD inspection is intended to provide useful schema evidence for rectangling. `xmlrectr` is not a complete XSD validation or repair framework.
-
----
-
-## Installation
-
-At present, `xmlrectr` can be installed from GitHub.
-
-The recommended method is `pak`:
-
-```r
-install.packages("pak")
-pak::pak("larry77/xmlrectr")
-```
-
-Alternatively:
-
-```r
-install.packages("remotes")
-remotes::install_github("larry77/xmlrectr")
-```
-
-Because `xmlrectr` contains native C code, the GitHub version is compiled from source and requires a working build toolchain and `libxml2` development files.
-
-<details>
-<summary><strong>Windows build requirements</strong></summary>
-
-Windows is a first-class supported platform. Use the Rtools version matching your R installation and install it in the default location.
-
-For the currently supported R series:
-
-- R 4.6.x: Rtools45
-- R 4.5.x: Rtools45
-- R 4.4.x: Rtools44
-
-With a normal R/Rtools installation, manual `PATH` configuration should not usually be necessary.
-
-If compilation fails, first check the toolchain:
-
-```r
-install.packages("pkgbuild")
-pkgbuild::has_build_tools(debug = TRUE)
-```
-
-Avoid mixing Rtools with unrelated MSYS2/MinGW/Strawberry Perl toolchains on `PATH`, as this can produce difficult-to-diagnose linking problems.
-
-The GitHub Actions workflow compiles and tests the package on `windows-latest`.
-
-</details>
-
-<details>
-<summary><strong>Linux build requirements</strong></summary>
-
-On Debian/Ubuntu:
-
-```bash
-sudo apt install libxml2-dev pkg-config
-```
-
-Then install `xmlrectr` from R using `pak` or `remotes`.
-
-</details>
-
-<details>
-<summary><strong>macOS build requirements</strong></summary>
-
-With Homebrew:
-
-```bash
-brew install libxml2 pkg-config
-export PKG_CONFIG_PATH="$(brew --prefix libxml2)/lib/pkgconfig:$PKG_CONFIG_PATH"
-```
-
-Then install `xmlrectr` from R.
-
-</details>
-
-For a local checkout:
-
-```r
-pak::local_install(".")
-```
 
 ---
 
