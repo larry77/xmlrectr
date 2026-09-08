@@ -249,18 +249,25 @@
 <div class="section level2">
 <h2 id="built-for-real-xml-not-only-toy-examples">Built for real XML, not only toy examples<a class="anchor" aria-label="anchor" href="#built-for-real-xml-not-only-toy-examples"></a>
 </h2>
-<p>The ambition to work with arbitrary XML is useful only if the implementation can cope with XML as it exists in practice: large documents, deep nesting, repeated records, namespaces and irregular structures.</p>
-<p>A substantial part of the development of <code>xmlrectr</code> has therefore focused on performance, memory behaviour and execution architecture.</p>
+<p>The ambition to work with arbitrary XML is useful only if the implementation can cope with XML as it exists in practice: large documents, deep nesting, repeated records, namespaces, irregular branches and substantial structural overhead.</p>
+<p>A large part of the development of <code>xmlrectr</code> has therefore focused on <strong>algorithmic cost, memory behaviour, workload decomposition and semantic parity</strong>.</p>
+<p>The package deliberately separates two questions:</p>
+<ol style="list-style-type: decimal">
+<li><strong>What should the rectangle mean?</strong></li>
+<li><strong>How should that rectangle be computed efficiently on this particular XML document?</strong></li>
+</ol>
+<p>Changing the computational engine must never change the first answer.</p>
 <div class="section level3">
 <h3 id="native-structural-acceleration">Native structural acceleration<a class="anchor" aria-label="anchor" href="#native-structural-acceleration"></a>
 </h3>
 <p>Performance-critical canonical reading and structural/indexing operations have native C implementations using <code>libxml2</code>.</p>
-<p>The R implementation remains the semantic reference: compiled code is used to accelerate structural bottlenecks, not to introduce a second set of rectangling semantics.</p>
+<p>The R implementation remains the semantic reference. Compiled code is used to accelerate structural bottlenecks, not to introduce a second set of rectangling semantics.</p>
+<p>This distinction matters: generic XML rectangling repeatedly performs structural operations for which interpreted R can become expensive on large trees. Moving those bottlenecks into compiled code makes the generic design practical without introducing vocabulary-specific shortcuts.</p>
 </div>
 <div class="section level3">
 <h3 id="bounded-memory-streaming">Bounded-memory streaming<a class="anchor" aria-label="anchor" href="#bounded-memory-streaming"></a>
 </h3>
-<p>For XML that should not be represented as one complete in-memory canonical table, <code>xmlrectr</code> provides a streaming path based on complete record subtrees.</p>
+<p>For XML that should not be represented as one complete in-memory canonical table, <code>xmlrectr</code> provides a streaming path based on <strong>complete record subtrees</strong>.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">batches</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
@@ -272,7 +279,16 @@
 <span>  <span class="op">}</span>,</span>
 <span>  parallel <span class="op">=</span> <span class="st">"auto"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Parsing and record-boundary detection remain coordinator-side. Workers receive complete independent record payloads rather than live <code>xml2</code>/libxml external pointers or parser state.</p>
+<p>The streaming architecture has an important correctness boundary:</p>
+<ul>
+<li>SAX parsing and record-boundary detection remain coordinator-side;</li>
+<li>XML is never split at arbitrary byte positions;</li>
+<li>workers receive complete, self-contained record material;</li>
+<li>live parser state and <code>xml2</code>/libxml external pointers are never passed between processes;</li>
+<li>source order and record identities remain controlled by the coordinator;</li>
+<li>duplicate source-ID checks and output callbacks remain coordinator-side.</li>
+</ul>
+<p>The point is not merely to “use less RAM”. The package tries to keep parser state, record ownership, output ordering and rectangling semantics cleanly separated.</p>
 </div>
 <div class="section level3">
 <h3 id="csv-and-parquet-output">CSV and Parquet output<a class="anchor" aria-label="anchor" href="#csv-and-parquet-output"></a>
@@ -294,6 +310,7 @@
 <span>  parallel <span class="op">=</span> <span class="st">"auto"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Parquet support requires the optional <code>arrow</code> package.</p>
+<p>The same high-level execution controls are used by the main in-memory, streaming, CSV and Parquet interfaces. Parallel execution is therefore part of the normal rectangling architecture rather than a separate workflow bolted onto one output format.</p>
 <hr>
 </div>
 </div>
@@ -309,7 +326,7 @@
 <span>  parallel <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Request parallel execution with tuned automatic settings</span></span>
+<span><span class="co"># Request parallel execution with tuned defaults</span></span>
 <span><span class="va">par_out</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
 <span>  <span class="va">file</span>,</span>
 <span>  <span class="va">spec</span>,</span>
@@ -322,62 +339,347 @@
 <span>  <span class="va">spec</span>,</span>
 <span>  parallel <span class="op">=</span> <span class="st">"auto"</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The sequential implementation is the semantic reference. Parallel execution is required to preserve the same result:</p>
+<p>The sequential implementation is the semantic oracle. Parallel execution is required to preserve the same result:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">seq_out</span>, <span class="va">par_out</span><span class="op">)</span></span></code></pre></div>
-<p>For ordinary use, <code>parallel = "auto"</code> is the recommended low-complexity choice when you want the engine to avoid process and scheduling overhead on small record workloads.</p>
-<div class="section level3">
-<h3 id="why-the-scheduler-is-adaptive">Why the scheduler is adaptive<a class="anchor" aria-label="anchor" href="#why-the-scheduler-is-adaptive"></a>
-</h3>
-<p>Parallel XML rectangling is not simply a matter of running <code>workers = parallel::detectCores()</code>.</p>
-<p>A useful execution plan depends on:</p>
+<p>The three modes have deliberately simple meanings:</p>
 <ul>
-<li>how many independent record subtrees exist;</li>
-<li>how coarse or fine those records are;</li>
-<li>the structural amount of work per record;</li>
-<li>available cores;</li>
-<li>task scheduling overhead;</li>
-<li>memory pressure and input ownership.</li>
+<li>
+<code>parallel = FALSE</code> uses the exact sequential path and does not require the parallel stack;</li>
+<li>
+<code>parallel = TRUE</code> requests parallel execution using the package’s tuned defaults;</li>
+<li>
+<code>parallel = "auto"</code> asks the engine to decide, from the observed workload, whether parallel execution is justified.</li>
 </ul>
-<p><code>xmlrectr</code> therefore uses structural workload information to decide whether and how to parallelise. Worker, chunk and task controls are available for advanced use, but the routine path is intentionally automated.</p>
-</div>
+<p>Lower-level <code>*_parallel()</code> functions exist for compatibility, testing and diagnostics. They are not the intended everyday API.</p>
 <div class="section level3">
-<h3 id="two-retained-parallel-strategies">Two retained parallel strategies<a class="anchor" aria-label="anchor" href="#two-retained-parallel-strategies"></a>
+<h3 id="parallelise-records-not-parser-state">Parallelise records, not parser state<a class="anchor" aria-label="anchor" href="#parallelise-records-not-parser-state"></a>
 </h3>
-<p>Two strategies exist because throughput and memory pressure are not the same optimisation problem.</p>
-<p><code>parallel_chunks</code> is throughput-oriented: independently owned vectorised chunks can be processed concurrently.</p>
-<p><code>shared_chunk</code> is memory-oriented: one bounded outer chunk can be shared through <code>mori</code>, reducing input-memory duplication while workers process coarse ranges from that shared input.</p>
-<p>You normally do not need to select between them manually. They remain exposed because advanced users may have machine-specific memory or throughput constraints.</p>
+<p>The parallel architecture follows a few strict rules:</p>
+<ol style="list-style-type: decimal">
+<li>Only independent <strong>complete XML record subtrees</strong> are parallelised.</li>
+<li>XML is never divided by arbitrary byte ranges.</li>
+<li>Live <code>xml2</code>/libxml external pointers are never sent to workers.</li>
+<li>SAX parsing and record-boundary detection remain coordinator-side.</li>
+<li>Workers receive self-contained record material.</li>
+<li>Source order, identifiers and sequential semantics must remain exact.</li>
+<li>Coordinator-side responsibilities such as duplicate-ID checks and callbacks remain coordinator-side.</li>
+<li>The caller’s pre-existing Future plan is restored after execution.</li>
+</ol>
+<p>These constraints are less flashy than a benchmark chart, but they are fundamental to making parallel execution a trustworthy implementation detail rather than a second semantics.</p>
 <hr>
 </div>
+</div>
+<div class="section level2">
+<h2 id="why-the-scheduler-is-adaptive">Why the scheduler is adaptive<a class="anchor" aria-label="anchor" href="#why-the-scheduler-is-adaptive"></a>
+</h2>
+<p>Parallel XML rectangling is not simply a matter of running:</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">workers</span> <span class="op">&lt;-</span> <span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/detectCores.html" class="external-link">detectCores</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>and dividing a file into equal pieces.</p>
+<p>A useful execution plan depends on the <strong>actual structural work available</strong>:</p>
+<ul>
+<li>how many independent records exist;</li>
+<li>how large their canonical subtrees are;</li>
+<li>whether tasks are coarse enough to amortise process and scheduling overhead;</li>
+<li>how much working memory can safely be admitted at once;</li>
+<li>how many cores are available;</li>
+<li>whether throughput or bounded memory is the more important constraint.</li>
+</ul>
+<p>For this reason, <code>xmlrectr</code> does not use filenames, XML vocabulary names, or rules learned specifically from the validation corpus to decide whether to parallelise.</p>
+<p>The automatic policy is structural.</p>
+<div class="section level3">
+<h3 id="automatic-worker-count-deliberately-conservative">Automatic worker count: deliberately conservative<a class="anchor" aria-label="anchor" href="#automatic-worker-count-deliberately-conservative"></a>
+</h3>
+<p>Benchmarks showed that increasing the number of workers beyond four can still reduce elapsed time, but efficiency falls and memory pressure increases.</p>
+<p>The automatic/default worker policy therefore normally uses <strong>up to four workers</strong>, while preserving a core for the system where possible.</p>
+<p>This is <strong>not a hard maximum</strong>.</p>
+<p>Advanced users can explicitly request more workers:</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
+<span>  <span class="va">file</span>,</span>
+<span>  <span class="va">spec</span>,</span>
+<span>  parallel <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  workers <span class="op">=</span> <span class="fl">8</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<p>The default is intended to be a balanced choice, not a claim that four workers are universally optimal.</p>
+</div>
+<div class="section level3">
+<h3 id="how-auto-currently-decides-whether-there-is-enough-work">How <code>"auto"</code> currently decides whether there is enough work<a class="anchor" aria-label="anchor" href="#how-auto-currently-decides-whether-there-is-enough-work"></a>
+</h3>
+<p>The current in-memory auto policy asks whether there is enough <strong>canonical record work per worker</strong> to justify process-level parallelism.</p>
+<p>The policy includes a work floor of approximately:</p>
+<pre class="text"><code>25,000 canonical record nodes per worker</code></pre>
+<p>together with sufficient record/subtree structure, approximately:</p>
+<pre class="text"><code>at least 128 records per worker</code></pre>
+<p>or</p>
+<pre class="text"><code>a median record subtree of at least 1,000 canonical nodes</code></pre>
+<p>These are engineering defaults derived from broad structural benchmarking. They are <strong>not XML-vocabulary rules</strong>, and they should not be read as eternal constants or promises of a particular speedup.</p>
+<p>There is also a cheap impossibility check. If the entire canonical table has fewer than roughly:</p>
+<pre class="text"><code>workers * 25,000</code></pre>
+<p>nodes, the workload cannot satisfy the per-worker work floor. Auto mode can then remain sequential immediately instead of performing a more expensive record-span analysis.</p>
+<p>This fast path is important. An early version of automatic planning was semantically correct but could make small sequential jobs noticeably slower simply because planning repeated structural work that the sequential path would perform anyway. The current design reuses validation and rejects obviously too-small workloads before doing that extra work.</p>
+<p>In other words, <strong>auto mode is designed not only to find parallel opportunities, but also to get out of the way when parallelism would be pointless.</strong></p>
+<hr>
+</div>
+</div>
+<div class="section level2">
+<h2 id="two-parallel-strategies-for-two-different-constraints">Two parallel strategies, for two different constraints<a class="anchor" aria-label="anchor" href="#two-parallel-strategies-for-two-different-constraints"></a>
+</h2>
+<p><code>xmlrectr</code> retains two parallel execution strategies because throughput and memory pressure are different optimisation problems.</p>
+<div class="section level3">
+<h3 id="parallel_chunks-throughput-oriented">
+<code>parallel_chunks</code>: throughput-oriented<a class="anchor" aria-label="anchor" href="#parallel_chunks-throughput-oriented"></a>
+</h3>
+<p>With <code>parallel_chunks</code>, workers own independent vectorised outer chunks.</p>
+<p>Conceptually:</p>
+<pre class="text"><code>chunk 1 ---&gt; worker 1
+chunk 2 ---&gt; worker 2
+chunk 3 ---&gt; worker 3
+chunk 4 ---&gt; worker 4</code></pre>
+<p>This strategy is designed primarily to:</p>
+<ul>
+<li>maximise throughput;</li>
+<li>keep scheduling straightforward;</li>
+<li>exploit coarse vectorised work;</li>
+<li>perform well when memory duplication is acceptable.</li>
+</ul>
+<p>For in-memory automatic execution, this is generally the preferred strategy.</p>
+<p>A useful scheduling model is approximately <strong>one active owned outer chunk per worker</strong>.</p>
+</div>
+<div class="section level3">
+<h3 id="shared_chunk-memory-oriented">
+<code>shared_chunk</code>: memory-oriented<a class="anchor" aria-label="anchor" href="#shared_chunk-memory-oriented"></a>
+</h3>
+<p>With <code>shared_chunk</code>, one bounded outer chunk is shared and subdivided into multiple vectorised tasks coordinated through <code>mori</code>.</p>
+<p>Conceptually:</p>
+<pre class="text"><code>             bounded shared outer chunk
+                 /    |    |    \
+              task  task  task  task
+                |     |     |     |
+              workers process coarse ranges</code></pre>
+<p>Its purpose is to reduce input-memory duplication while still preserving parallel work.</p>
+<p>This is particularly attractive for streaming, CSV and Parquet workflows, where bounded memory is part of the reason for choosing the execution mode in the first place.</p>
+<p>Automatic streaming/output execution therefore prefers <code>shared_chunk</code> when the required stack is available. If <code>mori</code> is unavailable, automatic execution can fall back to <code>parallel_chunks</code>.</p>
+<p>The trade-off is intentional:</p>
+<ul>
+<li>
+<code>parallel_chunks</code> is primarily throughput-oriented;</li>
+<li>
+<code>shared_chunk</code> is primarily memory-oriented.</li>
+</ul>
+<p>Neither strategy dominates the other on every machine and workload.</p>
+<hr>
+</div>
+</div>
+<div class="section level2">
+<h2 id="chunk-size-and-task-size-are-different-controls">Chunk size and task size are different controls<a class="anchor" aria-label="anchor" href="#chunk-size-and-task-size-are-different-controls"></a>
+</h2>
+<p>The advanced API exposes:</p>
+<pre class="text"><code><span><span class="va">workers</span></span>
+<span><span class="va">strategy</span></span>
+<span><span class="va">chunk_records</span></span>
+<span><span class="va">task_records</span></span></code></pre>
+<p>The last two parameters solve different problems.</p>
+<div class="section level3">
+<h3 id="chunk_records-working-set-admission">
+<code>chunk_records</code>: working-set admission<a class="anchor" aria-label="anchor" href="#chunk_records-working-set-admission"></a>
+</h3>
+<p><code>chunk_records</code> controls the size of the <strong>outer batch admitted at once</strong>.</p>
+<p>It therefore influences:</p>
+<ul>
+<li>memory pressure;</li>
+<li>how much vectorised work is available;</li>
+<li>how many independently owned chunks can be active.</li>
+</ul>
+<p>For the current streaming defaults:</p>
+<pre class="text"><code><span><span class="va">parallel_chunks</span><span class="op">:</span></span>
+<span>    <span class="va">chunk_records</span> <span class="op">=</span> <span class="fl">512</span></span></code></pre>
+<p>For <code>shared_chunk</code>:</p>
+<pre class="text"><code><span><span class="va">chunk_records</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min</a></span><span class="op">(</span><span class="fl">1024</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fl">256</span>, <span class="va">workers</span> <span class="op">*</span> <span class="fl">256</span><span class="op">)</span><span class="op">)</span></span></code></pre>
+<p>These are tuned defaults, not XML-specific rules.</p>
+</div>
+<div class="section level3">
+<h3 id="task_records-scheduling-granularity">
+<code>task_records</code>: scheduling granularity<a class="anchor" aria-label="anchor" href="#task_records-scheduling-granularity"></a>
+</h3>
+<p>Within a shared outer chunk, <code>task_records</code> controls how finely the work is subdivided for scheduling.</p>
+<p>Benchmarks found a fairly broad useful plateau around <strong>4 to 8 tasks per worker</strong>. The balanced automatic setting is therefore approximately <strong>4 tasks per worker</strong>.</p>
+<p>That gives workers enough independent work for load balancing without producing a large number of tiny tasks whose scheduling cost dominates useful computation.</p>
+<p>So:</p>
+<pre class="text"><code>chunk_records -&gt; controls admitted working-set size / memory
+task_records  -&gt; controls scheduling granularity inside that work</code></pre>
+<p>Keeping these concepts separate is especially important for <code>shared_chunk</code>.</p>
+<hr>
+</div>
+</div>
+<div class="section level2">
+<h2 id="what-the-benchmark-evidence-actually-showed">What the benchmark evidence actually showed<a class="anchor" aria-label="anchor" href="#what-the-benchmark-evidence-actually-showed"></a>
+</h2>
+<p>Performance results are included here because the defaults were not chosen by intuition alone.</p>
+<p>They should nevertheless be interpreted carefully:</p>
+<blockquote>
+<p><strong>Never compare raw elapsed times from different machines as though they belong to one benchmark series.</strong></p>
+</blockquote>
+<p>Absolute timings depend on processor, memory subsystem, operating system, R build, package versions and background load. The useful quantities are <strong>same-machine sequential/parallel speedup, worker efficiency, memory behaviour and exact semantic parity</strong>.</p>
+<p>The following results are representative development measurements on one machine, referred to during development as <code>einstein</code>. They document why the current defaults exist; they are not runtime guarantees.</p>
+<div class="section level3">
+<h3 id="worker-count-experiment">Worker-count experiment<a class="anchor" aria-label="anchor" href="#worker-count-experiment"></a>
+</h3>
+<p>A representative synthetic workload was approximately <strong>16.266 MiB</strong>.</p>
+<p>Sequential execution:</p>
+<pre class="text"><code>193.977 s</code></pre>
+<p>Parallel results:</p>
+<table class="table">
+<thead><tr>
+<th align="right">Workers</th>
+<th align="right"><code>parallel_chunks</code></th>
+<th align="right">Speedup</th>
+<th align="right"><code>shared_chunk</code></th>
+<th align="right">Speedup</th>
+</tr></thead>
+<tbody>
+<tr>
+<td align="right">2</td>
+<td align="right">121.585 s</td>
+<td align="right">1.60x</td>
+<td align="right">107.070 s</td>
+<td align="right">1.81x</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td align="right">63.340 s</td>
+<td align="right">3.06x</td>
+<td align="right">68.869 s</td>
+<td align="right">2.82x</td>
+</tr>
+<tr>
+<td align="right">11</td>
+<td align="right">46.051 s</td>
+<td align="right">4.21x</td>
+<td align="right">55.525 s</td>
+<td align="right">3.49x</td>
+</tr>
+</tbody>
+</table>
+<p>Several conclusions follow.</p>
+<p>First, more than four workers <strong>can</strong> improve elapsed time. Four is therefore not a hard ceiling.</p>
+<p>Second, scaling efficiency declines substantially at high worker counts. The extra processes are doing useful work, but the cost of coordination, memory traffic and finite task parallelism becomes increasingly important.</p>
+<p>Third, four workers gave a strong compromise between speedup, efficiency and memory pressure. That is why automatic/default worker selection is normally capped there unless the user explicitly chooses otherwise.</p>
+</div>
+<div class="section level3">
+<h3 id="memory-experiment">Memory experiment<a class="anchor" aria-label="anchor" href="#memory-experiment"></a>
+</h3>
+<p>On the same approximate 16.266 MiB workload with four workers:</p>
+<table class="table">
+<thead><tr>
+<th>Strategy</th>
+<th align="right">Peak PSS</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>parallel_chunks</code></td>
+<td align="right">about 3618 MiB</td>
+</tr>
+<tr>
+<td><code>shared_chunk</code></td>
+<td align="right">about 3142 MiB</td>
+</tr>
+</tbody>
+</table>
+<p>In that experiment, <code>shared_chunk</code> reduced peak proportional set size by roughly <strong>13%</strong> and private memory by roughly <strong>15%</strong>.</p>
+<p>Depending on phase, median PSS could fall by considerably more.</p>
+<p>That reduction is meaningful, even though <code>shared_chunk</code> can be slower on some workloads. It is the empirical reason the memory-oriented strategy remains part of the package rather than being removed in favour of the single fastest throughput result.</p>
+</div>
+<div class="section level3">
+<h3 id="what-this-does-not-mean">What this does <em>not</em> mean<a class="anchor" aria-label="anchor" href="#what-this-does-not-mean"></a>
+</h3>
+<p>These measurements do <strong>not</strong> imply:</p>
+<ul>
+<li>that four workers are always fastest;</li>
+<li>that <code>shared_chunk</code> always saves exactly 13% memory;</li>
+<li>that a 16 MiB XML file will take anything close to the timings above;</li>
+<li>that file size alone determines whether parallelism helps.</li>
+</ul>
+<p>The actual structural workload matters more than the byte size of the XML file.</p>
+<hr>
+</div>
+</div>
+<div class="section level2">
+<h2 id="auto-mode-in-real-world-smoke-tests">Auto mode in real-world smoke tests<a class="anchor" aria-label="anchor" href="#auto-mode-in-real-world-smoke-tests"></a>
+</h2>
+<p>The final automatic policy was also checked against real XML on the same development machine.</p>
+<p>Representative P6.1 smoke timings were:</p>
+<table class="table">
+<thead><tr>
+<th>XML</th>
+<th align="right">Sequential</th>
+<th align="right">Auto</th>
+<th>Auto decision</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>UBL</td>
+<td align="right">0.960 s</td>
+<td align="right">0.874 s</td>
+<td>sequential</td>
+</tr>
+<tr>
+<td>Maven</td>
+<td align="right">1.111 s</td>
+<td align="right">1.126 s</td>
+<td>sequential</td>
+</tr>
+<tr>
+<td>EAD</td>
+<td align="right">33.756 s</td>
+<td align="right">30.973 s</td>
+<td>parallel</td>
+</tr>
+</tbody>
+</table>
+<p>The important observation for UBL and Maven is not the tiny timing difference. It is that <strong>automatic planning did not impose a material penalty on small jobs that should remain sequential</strong>.</p>
+<p>The EAD document crossed the structural threshold and was sent to the parallel engine.</p>
+<p>That particular EAD run should not be used to argue either that parallelism is spectacular or that it is useless. It happened to lie relatively close to the crossover region on that machine. Larger synthetic workloads demonstrated much stronger same-machine speedups.</p>
+<hr>
 </div>
 <div class="section level2">
 <h2 id="tuning-for-technically-minded-users">Tuning for technically minded users<a class="anchor" aria-label="anchor" href="#tuning-for-technically-minded-users"></a>
 </h2>
 <p>Most users should stop at:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span><span class="va">file</span>, <span class="va">spec</span>, parallel <span class="op">=</span> <span class="st">"auto"</span><span class="op">)</span></span></code></pre></div>
 <p>The following controls exist for benchmarking, unusually constrained machines, or specialist tuning:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/rectangle_xml.html">rectangle_xml</a></span><span class="op">(</span></span>
 <span>  <span class="va">file</span>,</span>
 <span>  <span class="va">spec</span>,</span>
 <span>  parallel <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  workers <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  strategy <span class="op">=</span> <span class="st">"shared_chunk"</span>,</span>
-<span>  chunk_records <span class="op">=</span> <span class="fl">2048</span>,</span>
-<span>  task_records <span class="op">=</span> <span class="fl">128</span></span>
+<span>  chunk_records <span class="op">=</span> <span class="fl">1024</span>,</span>
+<span>  task_records <span class="op">=</span> <span class="fl">64</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>These settings should be tuned against <strong>your actual XML and your actual machine</strong>. A configuration that is optimal for one record structure or hardware platform need not be optimal for another.</p>
-<p>The package deliberately exposes this machinery without requiring ordinary users to manage it.</p>
+<p>Useful questions for an advanced tuning exercise are:</p>
+<ul>
+<li>Is the workload CPU-bound or memory-bound?</li>
+<li>Are there enough independent records to keep additional workers busy?</li>
+<li>Are records very uneven in size?</li>
+<li>Does peak memory, rather than elapsed time, constrain the run?</li>
+<li>Are tasks large enough to amortise process scheduling?</li>
+<li>Is the document already close to the sequential/parallel crossover?</li>
+</ul>
+<p>Do <strong>not</strong> tune from filenames or XML vocabulary names.</p>
+<p>Do <strong>not</strong> assume that tiny chunk/task values used in semantic stress tests are production recommendations.</p>
+<p>And do not optimise one specific XML file at the expense of the generic structural rules.</p>
 <hr>
 </div>
 <div class="section level2">
 <h2 id="a-reproducible-way-to-benchmark-your-own-xml">A reproducible way to benchmark your own XML<a class="anchor" aria-label="anchor" href="#a-reproducible-way-to-benchmark-your-own-xml"></a>
 </h2>
-<p>Absolute elapsed times are highly machine-dependent. For performance work, compare strategies <strong>on the same machine and the same XML</strong>.</p>
+<p>For performance work, compare strategies on <strong>the same machine and the same XML</strong>.</p>
 <p>A simple reproducible pattern is:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">spec</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compile_xml_profile.html">compile_xml_profile</a></span><span class="op">(</span><span class="va">profile</span>, <span class="va">file</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">t_seq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span></span>
@@ -414,8 +716,47 @@
 <span>  auto <span class="op">=</span> <span class="va">t_auto</span>,</span>
 <span>  forced_parallel <span class="op">=</span> <span class="va">t_forced</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>For serious benchmarking, repeat runs and compare within-machine speedups rather than quoting a single elapsed time. Small XML documents may correctly be faster sequentially because process startup and scheduling have a cost. Larger, sufficiently coarse record workloads are where parallel execution can pay off.</p>
-<p>This is also why <code>parallel = "auto"</code> exists: <strong>parallelism is a tool, not a goal in itself</strong>.</p>
+<p>For serious benchmarking:</p>
+<ol style="list-style-type: decimal">
+<li>run multiple repetitions;</li>
+<li>compare within-machine speedups rather than raw times from different platforms;</li>
+<li>inspect memory as well as elapsed time when that matters;</li>
+<li>keep semantic checks in the benchmark harness;</li>
+<li>distinguish performance benchmarks from tests whose only purpose is to stress correctness.</li>
+</ol>
+<p>Small XML documents may correctly be faster sequentially because process startup and scheduling have a cost. Larger, sufficiently coarse record workloads are where parallel execution can pay off.</p>
+<p>This is why <code>parallel = "auto"</code> exists: <strong>parallelism is a tool, not a goal in itself</strong>.</p>
+<hr>
+</div>
+<div class="section level2">
+<h2 id="semantic-testing-is-not-performance-benchmarking">Semantic testing is not performance benchmarking<a class="anchor" aria-label="anchor" href="#semantic-testing-is-not-performance-benchmarking"></a>
+</h2>
+<p>Some of the harshest parallel tests deliberately used settings that would make poor production defaults.</p>
+<p>For example, the 30-file forced-parallel semantic stress run used approximately:</p>
+<pre class="text"><code><span><span class="va">workers</span>       <span class="op">=</span> <span class="fl">2</span></span>
+<span><span class="va">chunk_records</span> <span class="op">=</span> <span class="fl">64</span></span>
+<span><span class="va">task_records</span>  <span class="op">=</span> <span class="fl">8</span></span></code></pre>
+<p>Those small values were chosen to force many scheduling boundaries and expose correctness problems.</p>
+<p>They were <strong>not</strong> selected for speed.</p>
+<p>The result was:</p>
+<ul>
+<li>30/30 exact in-memory sequential/parallel parity;</li>
+<li>30/30 exact streaming sequential/parallel parity.</li>
+</ul>
+<p>This distinction is important when reading the project’s benchmark history. Different experiments answer different questions:</p>
+<ul>
+<li>
+<strong>semantic stress tests</strong> ask whether alternative execution paths produce exactly the same result;</li>
+<li>
+<strong>throughput benchmarks</strong> ask how much elapsed time can be reduced;</li>
+<li>
+<strong>memory benchmarks</strong> ask what the working-set trade-offs are;</li>
+<li>
+<strong>scheduler/chunk experiments</strong> tune workload granularity;</li>
+<li>
+<strong>auto-policy experiments</strong> ask whether the engine chooses sensibly between sequential and parallel execution.</li>
+</ul>
+<p>Conclusions from one class should not be casually transferred to another.</p>
 <hr>
 </div>
 <div class="section level2">
@@ -428,10 +769,20 @@
 <li>exact in-memory sequential/forced-parallel parity;</li>
 <li>exact streaming sequential/forced-parallel parity;</li>
 <li>exact parity through the unified <code>parallel = "auto"</code> interface;</li>
-<li>synthetic scaling and memory experiments used to refine the balanced execution defaults.</li>
+<li>synthetic scaling experiments;</li>
+<li>memory experiments;</li>
+<li>worker-count, chunk-size and task-size tuning.</li>
 </ul>
-<p>In the 30-file automatic-policy run, 29 smaller workloads remained sequential and the one sufficiently large/coarse workload was selected for parallel execution. All outputs remained identical to the sequential semantic oracle.</p>
-<p>Crucially, the engine was <strong>not</strong> modified with vocabulary-specific rules or filename-specific exceptions to make these files pass.</p>
+<p>In the final 30-file automatic-policy run:</p>
+<ul>
+<li>
+<strong>30/30</strong> documents preserved exact semantic parity;</li>
+<li>
+<strong>29</strong> smaller workloads stayed sequential;</li>
+<li>only the sufficiently large/coarse EAD workload went parallel;</li>
+<li>the planning overhead on sequential auto decisions was essentially eliminated.</li>
+</ul>
+<p>Crucially, the engine was <strong>not</strong> modified with vocabulary-specific rules, filename-specific exceptions or thresholds tuned to make these files pass.</p>
 <details><summary><strong>Current 30-file real-world validation corpus</strong>
 </summary><p>The corpus covers very different XML domains and structures:</p>
 <ol style="list-style-type: decimal">
@@ -471,6 +822,30 @@
 <hr>
 </div>
 <div class="section level2">
+<h2 id="what-the-performance-work-tells-us">What the performance work tells us<a class="anchor" aria-label="anchor" href="#what-the-performance-work-tells-us"></a>
+</h2>
+<p>The engineering conclusions behind the current defaults can be summarised compactly:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Sequential execution is the semantic oracle.</strong></li>
+<li>Automatic workers normally stop at <strong>four</strong>, but explicit higher counts are allowed.</li>
+<li>More workers can improve raw elapsed time, with declining efficiency.</li>
+<li>
+<code>parallel_chunks</code> is the primary <strong>throughput-oriented</strong> strategy.</li>
+<li>
+<code>shared_chunk</code> is the primary <strong>memory-oriented</strong> strategy.</li>
+<li>
+<code>shared_chunk</code> has shown materially lower peak/private memory in representative tests.</li>
+<li>Outer <code>chunk_records</code> and inner <code>task_records</code> solve different problems and are tuned separately.</li>
+<li>Shared execution benefits from a modest number of coarse tasks; excessive tiny tasks waste scheduling time.</li>
+<li>Auto mode estimates <strong>structural work</strong>, not filenames, XML types or file size alone.</li>
+<li>Fast auto rejection is important so small documents pay essentially no planning penalty.</li>
+<li>No performance optimisation is accepted merely because it helps the existing validation corpus.</li>
+<li>Any tuning change must preserve exact sequential parity before its speed or memory result matters.</li>
+</ol>
+<p>The public API is simple because this machinery sits underneath it, not because the machinery does not exist.</p>
+<hr>
+</div>
+<div class="section level2">
 <h2 id="malformed-xml">Malformed XML<a class="anchor" aria-label="anchor" href="#malformed-xml"></a>
 </h2>
 <p><code>xmlrectr</code> expects well-formed XML.</p>
@@ -483,11 +858,11 @@
 </h2>
 <p>At present, <code>xmlrectr</code> can be installed from GitHub.</p>
 <p>The recommended method is <code>pak</code>:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"larry77/xmlrectr"</span><span class="op">)</span></span></code></pre></div>
 <p>Alternatively:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"remotes"</span><span class="op">)</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"larry77/xmlrectr"</span><span class="op">)</span></span></code></pre></div>
 <p>Because <code>xmlrectr</code> contains native C code, the GitHub version is compiled from source and requires a working build toolchain and <code>libxml2</code> development files.</p>
@@ -501,22 +876,22 @@
 </ul>
 <p>With a normal R/Rtools installation, manual <code>PATH</code> configuration should not usually be necessary.</p>
 <p>If compilation fails, first check the toolchain:</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pkgbuild"</span><span class="op">)</span></span>
 <span><span class="fu">pkgbuild</span><span class="fu">::</span><span class="fu"><a href="https://pkgbuild.r-lib.org/reference/has_build_tools.html" class="external-link">has_build_tools</a></span><span class="op">(</span>debug <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>Avoid mixing Rtools with unrelated MSYS2/MinGW/Strawberry Perl toolchains on <code>PATH</code>, as this can produce difficult-to-diagnose linking problems.</p>
 <p>The GitHub Actions workflow compiles and tests the package on <code>windows-latest</code>.</p>
 </details><details><summary><strong>Linux build requirements</strong>
 </summary><p>On Debian/Ubuntu:</p>
-<div class="sourceCode" id="cb22"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="fu">sudo</span> apt install libxml2-dev pkg-config</span></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a><span class="fu">sudo</span> apt install libxml2-dev pkg-config</span></code></pre></div>
 <p>Then install <code>xmlrectr</code> from R using <code>pak</code> or <code>remotes</code>.</p>
 </details><details><summary><strong>macOS build requirements</strong>
 </summary><p>With Homebrew:</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="ex">brew</span> install libxml2 pkg-config</span>
-<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="bu">export</span> <span class="va">PKG_CONFIG_PATH</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">brew</span> <span class="at">--prefix</span> libxml2<span class="va">)</span><span class="st">/lib/pkgconfig:</span><span class="va">$PKG_CONFIG_PATH</span><span class="st">"</span></span></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a><span class="ex">brew</span> install libxml2 pkg-config</span>
+<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a><span class="bu">export</span> <span class="va">PKG_CONFIG_PATH</span><span class="op">=</span><span class="st">"</span><span class="va">$(</span><span class="ex">brew</span> <span class="at">--prefix</span> libxml2<span class="va">)</span><span class="st">/lib/pkgconfig:</span><span class="va">$PKG_CONFIG_PATH</span><span class="st">"</span></span></code></pre></div>
 <p>Then install <code>xmlrectr</code> from R.</p>
 </details><p>For a local checkout:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/local_install.html" class="external-link">local_install</a></span><span class="op">(</span><span class="st">"."</span><span class="op">)</span></span></code></pre></div>
 <hr>
 </div>
