@@ -235,19 +235,28 @@ That canonical layer is the loss-aware structural foundation on which higher-lev
 
 ## Built for real XML, not only toy examples
 
-The ambition to work with arbitrary XML is useful only if the implementation can cope with XML as it exists in practice: large documents, deep nesting, repeated records, namespaces and irregular structures.
+The ambition to work with arbitrary XML is useful only if the implementation can cope with XML as it exists in practice: large documents, deep nesting, repeated records, namespaces, irregular branches and substantial structural overhead.
 
-A substantial part of the development of `xmlrectr` has therefore focused on performance, memory behaviour and execution architecture.
+A large part of the development of `xmlrectr` has therefore focused on **algorithmic cost, memory behaviour, workload decomposition and semantic parity**.
+
+The package deliberately separates two questions:
+
+1. **What should the rectangle mean?**
+2. **How should that rectangle be computed efficiently on this particular XML document?**
+
+Changing the computational engine must never change the first answer.
 
 ### Native structural acceleration
 
 Performance-critical canonical reading and structural/indexing operations have native C implementations using `libxml2`.
 
-The R implementation remains the semantic reference: compiled code is used to accelerate structural bottlenecks, not to introduce a second set of rectangling semantics.
+The R implementation remains the semantic reference. Compiled code is used to accelerate structural bottlenecks, not to introduce a second set of rectangling semantics.
+
+This distinction matters: generic XML rectangling repeatedly performs structural operations for which interpreted R can become expensive on large trees. Moving those bottlenecks into compiled code makes the generic design practical without introducing vocabulary-specific shortcuts.
 
 ### Bounded-memory streaming
 
-For XML that should not be represented as one complete in-memory canonical table, `xmlrectr` provides a streaming path based on complete record subtrees.
+For XML that should not be represented as one complete in-memory canonical table, `xmlrectr` provides a streaming path based on **complete record subtrees**.
 
 ```r
 batches <- list()
@@ -262,7 +271,16 @@ stats <- xml_stream_rectangle(
 )
 ```
 
-Parsing and record-boundary detection remain coordinator-side. Workers receive complete independent record payloads rather than live `xml2`/libxml external pointers or parser state.
+The streaming architecture has an important correctness boundary:
+
+- SAX parsing and record-boundary detection remain coordinator-side;
+- XML is never split at arbitrary byte positions;
+- workers receive complete, self-contained record material;
+- live parser state and `xml2`/libxml external pointers are never passed between processes;
+- source order and record identities remain controlled by the coordinator;
+- duplicate source-ID checks and output callbacks remain coordinator-side.
+
+The point is not merely to "use less RAM". The package tries to keep parser state, record ownership, output ordering and rectangling semantics cleanly separated.
 
 ### CSV and Parquet output
 
@@ -290,6 +308,8 @@ rectangle_xml_parquet(
 
 Parquet support requires the optional `arrow` package.
 
+The same high-level execution controls are used by the main in-memory, streaming, CSV and Parquet interfaces. Parallel execution is therefore part of the normal rectangling architecture rather than a separate workflow bolted onto one output format.
+
 ---
 
 ## Parallel execution without a second API
@@ -304,7 +324,7 @@ seq_out <- rectangle_xml(
   parallel = FALSE
 )
 
-# Request parallel execution with tuned automatic settings
+# Request parallel execution with tuned defaults
 par_out <- rectangle_xml(
   file,
   spec,
@@ -319,38 +339,316 @@ auto_out <- rectangle_xml(
 )
 ```
 
-The sequential implementation is the semantic reference. Parallel execution is required to preserve the same result:
+The sequential implementation is the semantic oracle. Parallel execution is required to preserve the same result:
 
 ```r
 identical(seq_out, par_out)
 ```
 
-For ordinary use, `parallel = "auto"` is the recommended low-complexity choice when you want the engine to avoid process and scheduling overhead on small record workloads.
+The three modes have deliberately simple meanings:
 
-### Why the scheduler is adaptive
+- `parallel = FALSE` uses the exact sequential path and does not require the parallel stack;
+- `parallel = TRUE` requests parallel execution using the package's tuned defaults;
+- `parallel = "auto"` asks the engine to decide, from the observed workload, whether parallel execution is justified.
 
-Parallel XML rectangling is not simply a matter of running `workers = parallel::detectCores()`.
+Lower-level `*_parallel()` functions exist for compatibility, testing and diagnostics. They are not the intended everyday API.
 
-A useful execution plan depends on:
+### Parallelise records, not parser state
 
-- how many independent record subtrees exist;
-- how coarse or fine those records are;
-- the structural amount of work per record;
-- available cores;
-- task scheduling overhead;
-- memory pressure and input ownership.
+The parallel architecture follows a few strict rules:
 
-`xmlrectr` therefore uses structural workload information to decide whether and how to parallelise. Worker, chunk and task controls are available for advanced use, but the routine path is intentionally automated.
+1. Only independent **complete XML record subtrees** are parallelised.
+2. XML is never divided by arbitrary byte ranges.
+3. Live `xml2`/libxml external pointers are never sent to workers.
+4. SAX parsing and record-boundary detection remain coordinator-side.
+5. Workers receive self-contained record material.
+6. Source order, identifiers and sequential semantics must remain exact.
+7. Coordinator-side responsibilities such as duplicate-ID checks and callbacks remain coordinator-side.
+8. The caller's pre-existing Future plan is restored after execution.
 
-### Two retained parallel strategies
+These constraints are less flashy than a benchmark chart, but they are fundamental to making parallel execution a trustworthy implementation detail rather than a second semantics.
 
-Two strategies exist because throughput and memory pressure are not the same optimisation problem.
+---
 
-`parallel_chunks` is throughput-oriented: independently owned vectorised chunks can be processed concurrently.
+## Why the scheduler is adaptive
 
-`shared_chunk` is memory-oriented: one bounded outer chunk can be shared through `mori`, reducing input-memory duplication while workers process coarse ranges from that shared input.
+Parallel XML rectangling is not simply a matter of running:
 
-You normally do not need to select between them manually. They remain exposed because advanced users may have machine-specific memory or throughput constraints.
+```r
+workers <- parallel::detectCores()
+```
+
+and dividing a file into equal pieces.
+
+A useful execution plan depends on the **actual structural work available**:
+
+- how many independent records exist;
+- how large their canonical subtrees are;
+- whether tasks are coarse enough to amortise process and scheduling overhead;
+- how much working memory can safely be admitted at once;
+- how many cores are available;
+- whether throughput or bounded memory is the more important constraint.
+
+For this reason, `xmlrectr` does not use filenames, XML vocabulary names, or rules learned specifically from the validation corpus to decide whether to parallelise.
+
+The automatic policy is structural.
+
+### Automatic worker count: deliberately conservative
+
+Benchmarks showed that increasing the number of workers beyond four can still reduce elapsed time, but efficiency falls and memory pressure increases.
+
+The automatic/default worker policy therefore normally uses **up to four workers**, while preserving a core for the system where possible.
+
+This is **not a hard maximum**.
+
+Advanced users can explicitly request more workers:
+
+```r
+rectangle_xml(
+  file,
+  spec,
+  parallel = TRUE,
+  workers = 8
+)
+```
+
+The default is intended to be a balanced choice, not a claim that four workers are universally optimal.
+
+### How `"auto"` currently decides whether there is enough work
+
+The current in-memory auto policy asks whether there is enough **canonical record work per worker** to justify process-level parallelism.
+
+The policy includes a work floor of approximately:
+
+```text
+25,000 canonical record nodes per worker
+```
+
+together with sufficient record/subtree structure, approximately:
+
+```text
+at least 128 records per worker
+```
+
+or
+
+```text
+a median record subtree of at least 1,000 canonical nodes
+```
+
+These are engineering defaults derived from broad structural benchmarking. They are **not XML-vocabulary rules**, and they should not be read as eternal constants or promises of a particular speedup.
+
+There is also a cheap impossibility check. If the entire canonical table has fewer than roughly:
+
+```text
+workers * 25,000
+```
+
+nodes, the workload cannot satisfy the per-worker work floor. Auto mode can then remain sequential immediately instead of performing a more expensive record-span analysis.
+
+This fast path is important. An early version of automatic planning was semantically correct but could make small sequential jobs noticeably slower simply because planning repeated structural work that the sequential path would perform anyway. The current design reuses validation and rejects obviously too-small workloads before doing that extra work.
+
+In other words, **auto mode is designed not only to find parallel opportunities, but also to get out of the way when parallelism would be pointless.**
+
+---
+
+## Two parallel strategies, for two different constraints
+
+`xmlrectr` retains two parallel execution strategies because throughput and memory pressure are different optimisation problems.
+
+### `parallel_chunks`: throughput-oriented
+
+With `parallel_chunks`, workers own independent vectorised outer chunks.
+
+Conceptually:
+
+```text
+chunk 1 ---> worker 1
+chunk 2 ---> worker 2
+chunk 3 ---> worker 3
+chunk 4 ---> worker 4
+```
+
+This strategy is designed primarily to:
+
+- maximise throughput;
+- keep scheduling straightforward;
+- exploit coarse vectorised work;
+- perform well when memory duplication is acceptable.
+
+For in-memory automatic execution, this is generally the preferred strategy.
+
+A useful scheduling model is approximately **one active owned outer chunk per worker**.
+
+### `shared_chunk`: memory-oriented
+
+With `shared_chunk`, one bounded outer chunk is shared and subdivided into multiple vectorised tasks coordinated through `mori`.
+
+Conceptually:
+
+```text
+             bounded shared outer chunk
+                 /    |    |    \
+              task  task  task  task
+                |     |     |     |
+              workers process coarse ranges
+```
+
+Its purpose is to reduce input-memory duplication while still preserving parallel work.
+
+This is particularly attractive for streaming, CSV and Parquet workflows, where bounded memory is part of the reason for choosing the execution mode in the first place.
+
+Automatic streaming/output execution therefore prefers `shared_chunk` when the required stack is available. If `mori` is unavailable, automatic execution can fall back to `parallel_chunks`.
+
+The trade-off is intentional:
+
+- `parallel_chunks` is primarily throughput-oriented;
+- `shared_chunk` is primarily memory-oriented.
+
+Neither strategy dominates the other on every machine and workload.
+
+---
+
+## Chunk size and task size are different controls
+
+The advanced API exposes:
+
+```text
+workers
+strategy
+chunk_records
+task_records
+```
+
+The last two parameters solve different problems.
+
+### `chunk_records`: working-set admission
+
+`chunk_records` controls the size of the **outer batch admitted at once**.
+
+It therefore influences:
+
+- memory pressure;
+- how much vectorised work is available;
+- how many independently owned chunks can be active.
+
+For the current streaming defaults:
+
+```text
+parallel_chunks:
+    chunk_records = 512
+```
+
+For `shared_chunk`:
+
+```text
+chunk_records = min(1024, max(256, workers * 256))
+```
+
+These are tuned defaults, not XML-specific rules.
+
+### `task_records`: scheduling granularity
+
+Within a shared outer chunk, `task_records` controls how finely the work is subdivided for scheduling.
+
+Benchmarks found a fairly broad useful plateau around **4 to 8 tasks per worker**. The balanced automatic setting is therefore approximately **4 tasks per worker**.
+
+That gives workers enough independent work for load balancing without producing a large number of tiny tasks whose scheduling cost dominates useful computation.
+
+So:
+
+```text
+chunk_records -> controls admitted working-set size / memory
+task_records  -> controls scheduling granularity inside that work
+```
+
+Keeping these concepts separate is especially important for `shared_chunk`.
+
+---
+
+## What the benchmark evidence actually showed
+
+Performance results are included here because the defaults were not chosen by intuition alone.
+
+They should nevertheless be interpreted carefully:
+
+> **Never compare raw elapsed times from different machines as though they belong to one benchmark series.**
+
+Absolute timings depend on processor, memory subsystem, operating system, R build, package versions and background load. The useful quantities are **same-machine sequential/parallel speedup, worker efficiency, memory behaviour and exact semantic parity**.
+
+The following results are representative development measurements on one machine, referred to during development as `einstein`. They document why the current defaults exist; they are not runtime guarantees.
+
+### Worker-count experiment
+
+A representative synthetic workload was approximately **16.266 MiB**.
+
+Sequential execution:
+
+```text
+193.977 s
+```
+
+Parallel results:
+
+| Workers | `parallel_chunks` | Speedup | `shared_chunk` | Speedup |
+|---:|---:|---:|---:|---:|
+| 2 | 121.585 s | 1.60x | 107.070 s | 1.81x |
+| 4 | 63.340 s | 3.06x | 68.869 s | 2.82x |
+| 11 | 46.051 s | 4.21x | 55.525 s | 3.49x |
+
+Several conclusions follow.
+
+First, more than four workers **can** improve elapsed time. Four is therefore not a hard ceiling.
+
+Second, scaling efficiency declines substantially at high worker counts. The extra processes are doing useful work, but the cost of coordination, memory traffic and finite task parallelism becomes increasingly important.
+
+Third, four workers gave a strong compromise between speedup, efficiency and memory pressure. That is why automatic/default worker selection is normally capped there unless the user explicitly chooses otherwise.
+
+### Memory experiment
+
+On the same approximate 16.266 MiB workload with four workers:
+
+| Strategy | Peak PSS |
+|---|---:|
+| `parallel_chunks` | about 3618 MiB |
+| `shared_chunk` | about 3142 MiB |
+
+In that experiment, `shared_chunk` reduced peak proportional set size by roughly **13%** and private memory by roughly **15%**.
+
+Depending on phase, median PSS could fall by considerably more.
+
+That reduction is meaningful, even though `shared_chunk` can be slower on some workloads. It is the empirical reason the memory-oriented strategy remains part of the package rather than being removed in favour of the single fastest throughput result.
+
+### What this does *not* mean
+
+These measurements do **not** imply:
+
+- that four workers are always fastest;
+- that `shared_chunk` always saves exactly 13% memory;
+- that a 16 MiB XML file will take anything close to the timings above;
+- that file size alone determines whether parallelism helps.
+
+The actual structural workload matters more than the byte size of the XML file.
+
+---
+
+## Auto mode in real-world smoke tests
+
+The final automatic policy was also checked against real XML on the same development machine.
+
+Representative P6.1 smoke timings were:
+
+| XML | Sequential | Auto | Auto decision |
+|---|---:|---:|---|
+| UBL | 0.960 s | 0.874 s | sequential |
+| Maven | 1.111 s | 1.126 s | sequential |
+| EAD | 33.756 s | 30.973 s | parallel |
+
+The important observation for UBL and Maven is not the tiny timing difference. It is that **automatic planning did not impose a material penalty on small jobs that should remain sequential**.
+
+The EAD document crossed the structural threshold and was sent to the parallel engine.
+
+That particular EAD run should not be used to argue either that parallelism is spectacular or that it is useless. It happened to lie relatively close to the crossover region on that machine. Larger synthetic workloads demonstrated much stronger same-machine speedups.
 
 ---
 
@@ -371,20 +669,31 @@ rectangle_xml(
   parallel = TRUE,
   workers = 4,
   strategy = "shared_chunk",
-  chunk_records = 2048,
-  task_records = 128
+  chunk_records = 1024,
+  task_records = 64
 )
 ```
 
-These settings should be tuned against **your actual XML and your actual machine**. A configuration that is optimal for one record structure or hardware platform need not be optimal for another.
+Useful questions for an advanced tuning exercise are:
 
-The package deliberately exposes this machinery without requiring ordinary users to manage it.
+- Is the workload CPU-bound or memory-bound?
+- Are there enough independent records to keep additional workers busy?
+- Are records very uneven in size?
+- Does peak memory, rather than elapsed time, constrain the run?
+- Are tasks large enough to amortise process scheduling?
+- Is the document already close to the sequential/parallel crossover?
+
+Do **not** tune from filenames or XML vocabulary names.
+
+Do **not** assume that tiny chunk/task values used in semantic stress tests are production recommendations.
+
+And do not optimise one specific XML file at the expense of the generic structural rules.
 
 ---
 
 ## A reproducible way to benchmark your own XML
 
-Absolute elapsed times are highly machine-dependent. For performance work, compare strategies **on the same machine and the same XML**.
+For performance work, compare strategies on **the same machine and the same XML**.
 
 A simple reproducible pattern is:
 
@@ -427,9 +736,50 @@ rbind(
 )
 ```
 
-For serious benchmarking, repeat runs and compare within-machine speedups rather than quoting a single elapsed time. Small XML documents may correctly be faster sequentially because process startup and scheduling have a cost. Larger, sufficiently coarse record workloads are where parallel execution can pay off.
+For serious benchmarking:
 
-This is also why `parallel = "auto"` exists: **parallelism is a tool, not a goal in itself**.
+1. run multiple repetitions;
+2. compare within-machine speedups rather than raw times from different platforms;
+3. inspect memory as well as elapsed time when that matters;
+4. keep semantic checks in the benchmark harness;
+5. distinguish performance benchmarks from tests whose only purpose is to stress correctness.
+
+Small XML documents may correctly be faster sequentially because process startup and scheduling have a cost. Larger, sufficiently coarse record workloads are where parallel execution can pay off.
+
+This is why `parallel = "auto"` exists: **parallelism is a tool, not a goal in itself**.
+
+---
+
+## Semantic testing is not performance benchmarking
+
+Some of the harshest parallel tests deliberately used settings that would make poor production defaults.
+
+For example, the 30-file forced-parallel semantic stress run used approximately:
+
+```text
+workers       = 2
+chunk_records = 64
+task_records  = 8
+```
+
+Those small values were chosen to force many scheduling boundaries and expose correctness problems.
+
+They were **not** selected for speed.
+
+The result was:
+
+- 30/30 exact in-memory sequential/parallel parity;
+- 30/30 exact streaming sequential/parallel parity.
+
+This distinction is important when reading the project's benchmark history. Different experiments answer different questions:
+
+- **semantic stress tests** ask whether alternative execution paths produce exactly the same result;
+- **throughput benchmarks** ask how much elapsed time can be reduced;
+- **memory benchmarks** ask what the working-set trade-offs are;
+- **scheduler/chunk experiments** tune workload granularity;
+- **auto-policy experiments** ask whether the engine chooses sensibly between sequential and parallel execution.
+
+Conclusions from one class should not be casually transferred to another.
 
 ---
 
@@ -443,11 +793,18 @@ The validation included:
 - exact in-memory sequential/forced-parallel parity;
 - exact streaming sequential/forced-parallel parity;
 - exact parity through the unified `parallel = "auto"` interface;
-- synthetic scaling and memory experiments used to refine the balanced execution defaults.
+- synthetic scaling experiments;
+- memory experiments;
+- worker-count, chunk-size and task-size tuning.
 
-In the 30-file automatic-policy run, 29 smaller workloads remained sequential and the one sufficiently large/coarse workload was selected for parallel execution. All outputs remained identical to the sequential semantic oracle.
+In the final 30-file automatic-policy run:
 
-Crucially, the engine was **not** modified with vocabulary-specific rules or filename-specific exceptions to make these files pass.
+- **30/30** documents preserved exact semantic parity;
+- **29** smaller workloads stayed sequential;
+- only the sufficiently large/coarse EAD workload went parallel;
+- the planning overhead on sequential auto decisions was essentially eliminated.
+
+Crucially, the engine was **not** modified with vocabulary-specific rules, filename-specific exceptions or thresholds tuned to make these files pass.
 
 <details>
 <summary><strong>Current 30-file real-world validation corpus</strong></summary>
@@ -490,6 +847,27 @@ The purpose of this corpus is structural diversity, not optimisation for these p
 </details>
 
 This validation does **not** mean that every arbitrary XML document has one objectively correct analyst table. It means that the package's generic structural rules and execution engine have been exercised across a broad set of real-world XML shapes without resorting to vocabulary-specific parsers.
+
+---
+
+## What the performance work tells us
+
+The engineering conclusions behind the current defaults can be summarised compactly:
+
+1. **Sequential execution is the semantic oracle.**
+2. Automatic workers normally stop at **four**, but explicit higher counts are allowed.
+3. More workers can improve raw elapsed time, with declining efficiency.
+4. `parallel_chunks` is the primary **throughput-oriented** strategy.
+5. `shared_chunk` is the primary **memory-oriented** strategy.
+6. `shared_chunk` has shown materially lower peak/private memory in representative tests.
+7. Outer `chunk_records` and inner `task_records` solve different problems and are tuned separately.
+8. Shared execution benefits from a modest number of coarse tasks; excessive tiny tasks waste scheduling time.
+9. Auto mode estimates **structural work**, not filenames, XML types or file size alone.
+10. Fast auto rejection is important so small documents pay essentially no planning penalty.
+11. No performance optimisation is accepted merely because it helps the existing validation corpus.
+12. Any tuning change must preserve exact sequential parity before its speed or memory result matters.
+
+The public API is simple because this machinery sits underneath it, not because the machinery does not exist.
 
 ---
 
