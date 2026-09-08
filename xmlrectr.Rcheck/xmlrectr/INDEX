@@ -1,0 +1,49 @@
+as_xml_profile          Coerce a portable object to an XML profile
+compile_xml_profile     Compile a profile into an executable rectangle
+                        specification
+inspect_xml             Inspect XML structure before defining a
+                        rectangle
+inspect_xsd             Inspect advisory XSD evidence
+make_rectangle          Create a lower-level rectangle specification
+propose_xml_profile     Propose candidate rows, identifiers and fields
+read_xml_profile        Read an XML profile from JSON or YAML
+rectangle_spec          Create an explicit rectangle specification
+rectangle_xml           Read and rectangle an XML file
+rectangle_xml_analyst   Create an analyst-oriented table directly from
+                        XML
+rectangle_xml_analyst_csv
+                        Write the analyst-oriented XML table to CSV
+rectangle_xml_analyst_parquet
+                        Write the analyst-oriented XML table to Parquet
+rectangle_xml_csv       Rectangle XML to a staged CSV file
+rectangle_xml_parallel
+                        Read and rectangle XML with explicit parallel
+                        execution
+rectangle_xml_parquet   Rectangle XML to a staged Parquet dataset
+review_rectangle        Review a compiled rectangle specification
+review_xml_proposal     Review one part of an XML profile proposal
+validate_xml_nodes      Validate the canonical XML node-table contract
+write_xml_profile       Write an XML profile to JSON or YAML
+xml_analyst_expand_context
+                        Expand analyst-table entity context
+xml_analyst_table       Project canonical XML into one analyst-oriented
+                        table
+xml_node_children       Return direct canonical children of XML nodes
+xml_nodes_schema        Return the canonical XML node-table schema
+xml_profile             Create a human-facing reusable XML profile
+xml_rectangle           Rectangle a canonical XML node table
+xml_rectangle_parallel
+                        Rectangle canonical nodes with explicit
+                        parallel execution
+xml_stream_nodes        Stream canonical XML node batches
+xml_stream_rectangle    Stream complete XML records through a rectangle
+                        callback
+xml_stream_rectangle_parallel
+                        Stream XML records with explicit parallel
+                        execution
+xml_text_to_nodes_memory
+                        Read XML text into the canonical node table
+xml_to_nodes_memory     Read an XML file into the canonical node table
+xml_to_nodes_stream     Read XML with the sequential streaming
+                        canonical engine
+xmlrectr-package        xmlrectr: generic XML rectangling

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<people>
+  <person id="P-001">
+    <name>Amina Okafor</name>
+    <birth-date>1988-04-12</birth-date>
+    <city>Lagos</city>
+  </person>
+  <person id="P-002">
+    <name>Jonas Berg</name>
+    <birth-date>1976-11-03</birth-date>
+    <city>Malmo</city>
+  </person>
+</people>

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Large XML, streaming and parallel execution</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Large XML, streaming and parallel
+execution</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(xmlrectr)</span></code></pre></div>
+<div id="compile-once" class="section level2">
+<h2>Compile once</h2>
+<p>Large-file workflows should normally begin with a reviewed profile
+and a compiled specification:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>file <span class="ot">&lt;-</span> <span class="fu">system.file</span>(<span class="st">&quot;extdata&quot;</span>, <span class="st">&quot;orders.xml&quot;</span>, <span class="at">package =</span> <span class="st">&quot;xmlrectr&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>profile <span class="ot">&lt;-</span> <span class="fu">xml_profile</span>(<span class="at">rows =</span> <span class="st">&quot;order&quot;</span>, <span class="at">id =</span> <span class="st">&quot;id&quot;</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="fu">compile_xml_profile</span>(profile, file)</span></code></pre></div>
+<p>The small bundled file is used only to make the examples
+reproducible. The same functions are designed for much larger XML
+documents.</p>
+</div>
+<div id="in-memory-execution" class="section level2">
+<h2>In-memory execution</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>out <span class="ot">&lt;-</span> <span class="fu">rectangle_xml</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>  <span class="st">&quot;large.xml&quot;</span>,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>  spec,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="at">parallel =</span> <span class="st">&quot;auto&quot;</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>The in-memory automatic decision examines independent record spans
+and structural workload. It does not recognize filenames or XML
+vocabularies.</p>
+</div>
+<div id="streaming-execution" class="section level2">
+<h2>Streaming execution</h2>
+<p>For files that should not be represented as one complete canonical
+table in memory, use the streaming engine:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>batches <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>stats <span class="ot">&lt;-</span> <span class="fu">xml_stream_rectangle</span>(</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>  <span class="st">&quot;large.xml&quot;</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>  spec,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>  <span class="at">callback =</span> <span class="cf">function</span>(batch) {</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    batches[[<span class="fu">length</span>(batches) <span class="sc">+</span> <span class="dv">1</span><span class="dt">L</span>]] <span class="ot">&lt;&lt;-</span> batch</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>  },</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>  <span class="at">parallel =</span> <span class="st">&quot;auto&quot;</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span></code></pre></div>
+<p>SAX parsing and record-boundary detection remain coordinator-side.
+Workers receive only complete independent record subtrees; libxml/xml2
+external pointers and live parser state never cross a worker
+boundary.</p>
+</div>
+<div id="csv-output" class="section level2">
+<h2>CSV output</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">rectangle_xml_csv</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>  <span class="st">&quot;large.xml&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  spec,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="at">output =</span> <span class="st">&quot;large.csv&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">parallel =</span> <span class="st">&quot;auto&quot;</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>)</span></code></pre></div>
+<p>CSV publication is staged so a failed run does not silently publish a
+partial final file.</p>
+</div>
+<div id="parquet-output" class="section level2">
+<h2>Parquet output</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">rectangle_xml_parquet</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;large.xml&quot;</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  spec,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>  <span class="at">output_dir =</span> <span class="st">&quot;large-parquet&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>  <span class="at">compression =</span> <span class="st">&quot;snappy&quot;</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="at">parallel =</span> <span class="st">&quot;auto&quot;</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>)</span></code></pre></div>
+<p>Parquet requires the optional <code>arrow</code> package and is the
+preferred analytical backend when preserving declared column types and
+processing large results.</p>
+</div>
+<div id="automatic-workers-and-scheduling" class="section level2">
+<h2>Automatic workers and scheduling</h2>
+<p>Most users should not need to specify workers, chunk sizes or task
+sizes.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">rectangle_xml</span>(<span class="st">&quot;large.xml&quot;</span>, spec, <span class="at">parallel =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>The balanced defaults use structural workload and available cores.
+Advanced controls remain available when benchmarking or when a
+machine-specific memory constraint matters:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">rectangle_xml</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="st">&quot;large.xml&quot;</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  spec,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">parallel =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="at">workers =</span> <span class="dv">8</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="at">strategy =</span> <span class="st">&quot;shared_chunk&quot;</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="at">chunk_records =</span> <span class="dv">2048</span>,</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  <span class="at">task_records =</span> <span class="dv">128</span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div id="the-two-parallel-strategies" class="section level2">
+<h2>The two parallel strategies</h2>
+<div id="parallel_chunks" class="section level3">
+<h3><code>parallel_chunks</code></h3>
+<p>This is throughput-oriented. Several independently owned vectorized
+chunks can be processed concurrently. In-memory automatic execution
+normally selects this strategy.</p>
+</div>
+<div id="shared_chunk" class="section level3">
+<h3><code>shared_chunk</code></h3>
+<p>This is RAM-oriented. One bounded outer chunk is shared through
+<code>mori</code>, and workers process coarse vectorized ranges from
+that shared input. Empirical PSS measurements during development showed
+a real reduction in memory pressure, so this strategy is intentionally
+retained even when independently owned chunks are sometimes faster.</p>
+</div>
+</div>
+<div id="why-streaming-auto-does-not-pre-count-the-xml" class="section level2">
+<h2>Why streaming auto does not pre-count the XML</h2>
+<p>An in-memory call already owns the complete canonical table, so the
+scheduler can cheaply inspect record spans before choosing sequential or
+parallel work. Streaming is different: making a complete preliminary
+pass just to count records would undermine the bounded single-pass
+design. Therefore streaming auto does not add a second full scan merely
+for presentation or scheduling.</p>
+</div>
+<div id="correctness-invariants" class="section level2">
+<h2>Correctness invariants</h2>
+<p>Sequential and parallel execution must produce the same rectangle.
+Parallel scheduling may change completion order internally, but the
+coordinator restores source/document order before publishing results and
+keeps global identifier checks and writers coordinator-side.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

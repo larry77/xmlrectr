@@ -1,0 +1,20 @@
+* installing *source* package ‘xmlrectr’ ...
+** this is package ‘xmlrectr’ version ‘0.0.0.9000’
+** using staged installation
+** libs
+using C compiler: ‘x86_64-linux-gnu-gcc (Debian 14.2.0-19) 14.2.0’
+x86_64-linux-gnu-gcc -std=gnu23 -I"/usr/share/R/include" -DNDEBUG `pkg-config --cflags libxml-2.0`      -fpic  -g -O2 -ffile-prefix-map=/build/r-base-4.6.1=. -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -Wdate-time -D_FORTIFY_SOURCE=2  -c xmlrect_native.c -o xmlrect_native.o
+x86_64-linux-gnu-gcc -std=gnu23 -shared -L/usr/lib/R/lib -Wl,-z,relro -o xmlrectr.so xmlrect_native.o -lxml2 -L/usr/lib/R/lib -lR
+installing to /home/lorenzo/mega_pcloud/work/development/xmlrectr/xmlrectr.Rcheck/00LOCK-xmlrectr/00new/xmlrectr/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (xmlrectr)

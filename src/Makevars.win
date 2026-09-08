@@ -1,0 +1,4 @@
+# Rtools/MSYS2 installations with libxml2 available through pkg-config use
+# the same portable discovery mechanism.
+PKG_CPPFLAGS = `pkg-config --cflags libxml-2.0`
+PKG_LIBS = `pkg-config --libs libxml-2.0`

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<shipments>
+  <shipment id="S-001" status="ready">
+    <items>
+      <item sku="A-10">
+        <quantity>2</quantity>
+      </item>
+      <item sku="B-20">
+        <quantity>1</quantity>
+      </item>
+    </items>
+    <payments>
+      <payment method="card">
+        <amount>19.50</amount>
+      </payment>
+      <payment method="voucher">
+        <amount>5.00</amount>
+      </payment>
+    </payments>
+  </shipment>
+</shipments>

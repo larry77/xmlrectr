@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<orders xmlns="urn:example:orders" generated="2026-09-03">
+  <order id="A-001" status="paid">
+    <customer>
+      <name>Ana Silva</name>
+      <postal-code>00123</postal-code>
+    </customer>
+    <item sku="BK-1" quantity="2">
+      <description>Notebook</description>
+      <unit-price currency="EUR">4.50</unit-price>
+    </item>
+    <item sku="PN-2" quantity="1">
+      <description>Blue pen</description>
+      <unit-price currency="EUR">1.25</unit-price>
+    </item>
+    <note priority="normal">Leave at reception</note>
+  </order>
+  <order id="A-002" status="pending">
+    <customer>
+      <name>Marc Dubois</name>
+    </customer>
+    <item sku="ER-4" quantity="3">
+      <description>Eraser</description>
+      <unit-price currency="EUR">0.80</unit-price>
+    </item>
+  </order>
+</orders>
+

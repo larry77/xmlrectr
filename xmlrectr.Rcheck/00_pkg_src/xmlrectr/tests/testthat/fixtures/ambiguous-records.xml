@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <orders>
+    <order id="O1"><status>open</status></order>
+    <order id="O2"><status>closed</status></order>
+  </orders>
+  <people>
+    <person id="P1"><name>Ana</name></person>
+    <person id="P2"><name>Marc</name></person>
+  </people>
+</root>

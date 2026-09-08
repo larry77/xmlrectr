@@ -1,0 +1,73 @@
+url: https://larry77.github.io/xmlrectr/
+
+template:
+  bootstrap: 5
+
+home:
+  title: xmlrectr — generic XML rectangling for R
+  description: Rectangle arbitrary XML into analysis-friendly tables with reviewable profiles, streaming and automatic parallel execution.
+
+navbar:
+  structure:
+    left: [reference, articles, news]
+    right: [search, github]
+
+articles:
+- title: Workflows
+  navbar: Workflows
+  contents:
+  - getting-started
+  - large-xml
+  - development
+
+reference:
+- title: Discover XML structure
+  desc: Canonical readers and structural inspection.
+  contents:
+  - xml_nodes_schema
+  - xml_to_nodes_memory
+  - xml_text_to_nodes_memory
+  - xml_stream_nodes
+  - xml_to_nodes_stream
+  - validate_xml_nodes
+  - xml_node_children
+  - inspect_xml
+
+- title: Proposals and profiles
+  desc: Review structural evidence and define reusable extraction contracts.
+  contents:
+  - propose_xml_profile
+  - review_xml_proposal
+  - xml_profile
+  - as_xml_profile
+  - write_xml_profile
+  - read_xml_profile
+  - compile_xml_profile
+  - inspect_xsd
+  - make_rectangle
+  - rectangle_spec
+  - review_rectangle
+
+- title: Rectangle XML
+  desc: In-memory, streaming, CSV and Parquet execution through the unified interface.
+  contents:
+  - xml_rectangle
+  - rectangle_xml
+  - xml_stream_rectangle
+  - rectangle_xml_csv
+  - rectangle_xml_parquet
+
+- title: Analyst-oriented table
+  contents:
+  - xml_analyst_table
+  - xml_analyst_expand_context
+  - rectangle_xml_analyst
+  - rectangle_xml_analyst_csv
+  - rectangle_xml_analyst_parquet
+
+- title: Advanced parallel execution
+  desc: Explicit low-level entry points retained for diagnostics and tuning.
+  contents:
+  - xml_rectangle_parallel
+  - rectangle_xml_parallel
+  - xml_stream_rectangle_parallel

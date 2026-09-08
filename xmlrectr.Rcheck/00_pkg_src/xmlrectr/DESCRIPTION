@@ -1,0 +1,28 @@
+Package: xmlrectr
+Type: Package
+Title: Rectangle Arbitrary XML into Analysis-Friendly Tables
+Version: 0.0.0.9000
+Authors@R: c(
+    person("Package", "Maintainer", email = "maintainer@example.org", role = c("aut", "cre"))
+  )
+Description: Converts arbitrary XML into canonical node tables and analysis-friendly
+    rectangular outputs without requiring a vocabulary-specific parser. Supports
+    conservative structure proposals, explicit reusable profiles, advisory XSD
+    inspection, bounded streaming, CSV and Parquet output, an analyst-oriented
+    single-table projection, and record-level parallel execution with automatic
+    scheduling. The native implementation uses libxml2 for structural acceleration
+    while the R implementation remains the semantic reference.
+License: GPL-3
+Encoding: UTF-8
+Depends: R (>= 4.3.0)
+Imports: stats, tibble, tools, utils, xml2, XML
+Suggests: arrow, future, future.mirai, futurize, furrr, jsonlite,
+        knitr, mori, pkgdown, progressr, purrr, rmarkdown, testthat (>=
+        3.0.0), yaml
+SystemRequirements: libxml2 development files, pkg-config
+NeedsCompilation: yes
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Packaged: 2026-09-07 20:43:57 UTC; lorenzo
+Author: Package Maintainer [aut, cre]
+Maintainer: Package Maintainer <maintainer@example.org>

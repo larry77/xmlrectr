@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog generated="2026-09-05">
+  <group id="G-1" note="">
+    <item id="I-1">
+      <name>Alpha</name>
+      <quantity>2</quantity>
+      <flag/>
+      <description>Hello <b>bold</b> world.</description>
+    </item>
+    <item id="I-2">
+      <name>Beta</name>
+      <quantity>3</quantity>
+    </item>
+    <payment id="P-1">
+      <amount>1.5</amount>
+    </payment>
+    <payment id="P-2">
+      <amount>2.5</amount>
+    </payment>
+  </group>
+  <!--analyst-visible comment-->
+  <?check yes?>
+</catalog>

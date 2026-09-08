@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?build target="analysis"?>
+<!--before the root-->
+<root><value>kept</value></root>
+<!--after the root-->
+<?audit complete?>

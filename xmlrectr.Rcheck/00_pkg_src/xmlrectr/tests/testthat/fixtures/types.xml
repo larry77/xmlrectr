@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<measurements>
+  <measurement id="M-001">
+    <count>12</count>
+    <ratio>3.50</ratio>
+    <active>true</active>
+    <observed>2026-09-04</observed>
+    <code>00123</code>
+  </measurement>
+  <measurement id="M-002">
+    <count>-7</count>
+    <ratio>1.25e2</ratio>
+    <active>0</active>
+    <observed>2026-09-05</observed>
+    <code>00007</code>
+  </measurement>
+</measurements>

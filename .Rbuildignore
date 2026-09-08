@@ -1,0 +1,10 @@
+^\.git$
+^\.github$
+^\.gitignore$
+^DEVELOPMENT\.md$
+^README\.Rmd$
+^docs$
+^pkgdown$
+^xmlrectr\.Rproj$
+^xmlrectr\.Rcheck$
+^xmlrectr_.*\.tar\.gz$

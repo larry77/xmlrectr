@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Architecture and validation</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Architecture and validation</h1>
+
+
+
+<div id="semantic-reference-first" class="section level2">
+<h2>Semantic reference first</h2>
+<p><code>xmlrectr</code> was packaged only after the standalone engine
+reached a frozen P6.1 validation point. The R implementation remains the
+semantic reference; native C code accelerates canonical reading and
+structural/indexing work without changing entity choice, naming, typing
+or source-key policy.</p>
+</div>
+<div id="canonical-contract" class="section level2">
+<h2>Canonical contract</h2>
+<p>Both in-memory and streaming execution preserve the same canonical
+columns: <code>document_id</code>, <code>node_id</code>,
+<code>parent_id</code>, <code>node_order</code>,
+<code>sibling_order</code>, <code>depth</code>, <code>node_type</code>,
+<code>qualified_name</code>, <code>local_name</code>,
+<code>prefix</code>, <code>namespace_uri</code> and
+<code>value</code>.</p>
+</div>
+<div id="parallel-execution" class="section level2">
+<h2>Parallel execution</h2>
+<p>Only complete independent XML record subtrees are sent to workers.
+The coordinator retains SAX parsing, record-boundary detection, global
+identifier checks, result ordering, callbacks and output
+publication.</p>
+<p>Two strategies are retained intentionally:</p>
+<ul>
+<li><code>parallel_chunks</code> for throughput;</li>
+<li><code>shared_chunk</code> for reduced input-memory pressure through
+<code>mori</code>.</li>
+</ul>
+<p>The public interface does not require users to choose between them
+for routine work: <code>parallel = &quot;auto&quot;</code> applies structural
+scheduling rules and automatic worker/chunk/task defaults.</p>
+</div>
+<div id="validation-before-package-conversion" class="section level2">
+<h2>Validation before package conversion</h2>
+<p>The P6.1 standalone engine passed:</p>
+<ul>
+<li>the complete focused unit/regression suite;</li>
+<li>exact in-memory and streaming sequential/forced-parallel parity on
+30 structurally diverse real-world XML documents;</li>
+<li>exact parity on the same 30-file corpus through
+<code>parallel = &quot;auto&quot;</code>;</li>
+<li>synthetic scaling, worker-scaling and memory experiments used to
+derive the current balanced defaults.</li>
+</ul>
+<p>The 30-file auto-policy run selected sequential execution for 29
+small workloads and parallel execution for the one sufficiently
+large/coarse workload, while all outputs remained identical to the
+sequential oracle.</p>
+</div>
+<div id="package-conversion-rule" class="section level2">
+<h2>Package conversion rule</h2>
+<p>The first package version intentionally keeps the validated R engine
+consolidated in one file. Package-level regression tests should pass
+before mechanically splitting the source into modules. New semantics
+should never be mixed into a refactoring-only split.</p>
+<p>The full engineering history, scheduler rationale, benchmark
+interpretation and release checklist are maintained in the repository’s
+<code>DEVELOPMENT.md</code>.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

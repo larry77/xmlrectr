@@ -1,0 +1,7 @@
+version: 1
+rows: order
+id: id
+fields:
+  order_status: status
+  customer: customer/name
+layout: safe

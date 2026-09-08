@@ -1,0 +1,133 @@
+---
+title: "Getting started with unknown XML"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with unknown XML}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r}
+library(xmlrectr)
+```
+
+## The core idea
+
+`xmlrectr` separates structural evidence from the analytical decision. The
+recommended workflow is:
+
+```text
+proposal -> review -> profile -> rectangle
+```
+
+The proposal is deliberately not executable. It tells you what the sample XML
+contains; you decide what a row means and which values belong in the result.
+
+## Inspect a sample
+
+The package ships with a small XML example:
+
+```{r}
+file <- system.file("extdata", "orders.xml", package = "xmlrectr")
+proposal <- propose_xml_profile(file)
+proposal
+```
+
+Review candidate row structures:
+
+```{r}
+review_xml_proposal(proposal, "rows")
+```
+
+Review possible identifiers and fields:
+
+```{r}
+review_xml_proposal(proposal, "ids")
+review_xml_proposal(proposal, "fields")
+```
+
+## Define the profile
+
+For this XML family, one `order` is the desired analytical row and its `id`
+value identifies the record:
+
+```{r}
+profile <- xml_profile(
+  rows = "order",
+  id = "id"
+)
+profile
+```
+
+A profile is intentionally small and human-readable. It can be stored as JSON
+or YAML and reviewed independently from the code that executes it.
+
+```{r eval=FALSE}
+write_xml_profile(profile, "orders-profile.json")
+profile <- read_xml_profile("orders-profile.json")
+```
+
+## Rectangle the XML
+
+The simplest call can compile the profile against the file and apply it:
+
+```{r}
+out <- rectangle_xml(file, profile)
+out
+```
+
+For repeated processing of files from the same XML family, compile once and
+reuse the specification:
+
+```{r}
+spec <- compile_xml_profile(profile, file)
+out2 <- rectangle_xml(file, spec)
+identical(out, out2)
+```
+
+## Parallel execution is an option, not another workflow
+
+The same function controls execution:
+
+```{r eval=FALSE}
+rectangle_xml(file, spec, parallel = FALSE)   # exact sequential path
+rectangle_xml(file, spec, parallel = TRUE)    # request tuned parallel defaults
+rectangle_xml(file, spec, parallel = "auto")  # engine chooses
+```
+
+`parallel = "auto"` is useful for ordinary work because small record workloads
+stay sequential instead of paying process startup/scheduling overhead.
+
+## XSD-assisted review
+
+If an XSD exists, it can provide additional occurrence/required/type evidence:
+
+```{r}
+typed_xml <- system.file("extdata", "types.xml", package = "xmlrectr")
+typed_xsd <- system.file("extdata", "types.xsd", package = "xmlrectr")
+
+xsd_proposal <- propose_xml_profile(typed_xml, xsd = typed_xsd)
+review_xml_proposal(xsd_proposal, "xsd")
+```
+
+XSD information is advisory. It does not automatically determine the best
+analytical rectangle, and `inspect_xsd()` is not intended as a complete XSD
+validator.
+
+## Exploratory analyst table
+
+When you want one self-contained table quickly and do not yet need a reusable
+profile contract:
+
+```{r}
+analyst <- rectangle_xml_analyst(file)
+analyst
+```
+
+The analyst table retains universal `xml_*` provenance/entity columns. For
+production extraction across a family of documents, prefer an explicit profile
+once the intended structure is understood.
