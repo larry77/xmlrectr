@@ -21,6 +21,10 @@ articles:
   - development
 
 reference:
+- title: Package overview
+  contents:
+  - xmlrectr-package
+
 - title: Discover XML structure
   desc: Canonical readers and structural inspection.
   contents:
